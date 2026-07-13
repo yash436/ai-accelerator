@@ -5,10 +5,12 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, EmailStr
+from rag_engine import ProductionRAGEngine
 
 app = FastAPI(title="Enterprise Streaming Engine", version="1.0.0")
+rag_service = ProductionRAGEngine() # Instantiate vector core
 
-# Setup CORS for your Next.js frontend
+# Setup CORS for Next.js frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
@@ -85,3 +87,38 @@ async def stream_telemetry(
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+
+# --- RAG Schemas ---
+class DocumentPayload(BaseModel):
+    filename: str = Field(..., min_length=2)
+    content: str = Field(..., min_length=10)
+    owner: str = Field(default="admin_level_1")
+
+class QueryPayload(BaseModel):
+    question: str = Field(..., min_length=3)
+    user_role: str = Field(default="admin_level_1")
+
+# --- RAG Endpoints ---
+@app.post("/api/v1/rag/ingest")
+async def ingest_document(payload: DocumentPayload):
+    """
+    Accepts text documentation strings, converts them into chunks and vector models,
+    and saves them natively on your Windows workspace directory.
+    """
+    result = rag_service.process_and_index_document(
+        raw_text=payload.content,
+        filename=payload.filename,
+        doc_owner=payload.owner
+    )
+    return {"success": True, "metrics": result}
+
+@app.post("/api/v1/rag/search")
+async def search_knowledge(payload: QueryPayload):
+    """
+    Executes semantic mathematical similarity searches against indexed documents.
+    """
+    matches = rag_service.query_knowledge_base(
+        query_text=payload.question,
+        required_perm=payload.user_role
+    )
+    return {"success": True, "results": matches}
