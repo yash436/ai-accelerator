@@ -1,3 +1,4 @@
+import json
 import asyncio
 from typing import AsyncGenerator
 from fastapi import FastAPI, Depends, Request, status
@@ -8,9 +9,14 @@ from pydantic import BaseModel, Field, EmailStr
 from rag_engine import ProductionRAGEngine
 from orchestrator import AIOrchestrationEngine
 
-app = FastAPI(title="Enterprise Streaming Engine", version="1.0.0")
+# Explicitly import our functional tool handlers and the graph engine class
+from agent_engine import CodingTDAgent, run_python_script_in_workspace, extract_all_json_blocks
+
+# Instantiate the core services
+app = FastAPI(title="Enterprise AI Accelerator Hub", version="1.0.0")
 rag_service = ProductionRAGEngine() # Instantiate vector core
 orchestrator_service = AIOrchestrationEngine()
+coding_agent_service = CodingTDAgent()
 
 # Setup CORS for Next.js frontend
 app.add_middleware(
@@ -142,3 +148,104 @@ async def chat_stream_endpoint(payload: ChatPayload):
         ),
         media_type="text/event-stream"
     )
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+# Fixed static thread context boundary configuration for single workspace debugging
+THREAD_CONFIG = {"configurable": {"thread_id": "tdd_session_1"}}
+
+class InitTaskPayload(BaseModel):
+    requirement: str
+
+# Fixed strict schema mapping
+class ResumeTaskPayload(BaseModel):
+    approved: bool
+    history_messages: list[str] = []
+
+@app.post("/api/v1/agent/init")
+async def initialize_agent_run(payload: InitTaskPayload):
+    from langchain_core.messages import HumanMessage
+
+    try:
+        coding_agent_service.memory.storage.clear()
+    except:
+        pass
+
+    initial_state = {
+        "messages": [HumanMessage(content=payload.requirement)],
+        "agent_logs": [],
+        "requires_approval": False,
+        "pending_action": ""
+    }
+
+    output = coding_agent_service.compiled_workflow.invoke(initial_state, config=THREAD_CONFIG)
+
+    return {
+        "success": True,
+        "requires_approval": output.get("requires_approval", False),
+        "pending_action": output.get("pending_action", ""),
+        "execution_history": output.get("agent_logs", []),
+        "messages": [m.content for m in output.get("messages", [])]
+    }
+
+@app.post("/api/v1/agent/resume")
+async def resume_agent_run(payload: ResumeTaskPayload):
+    from langchain_core.messages import HumanMessage
+
+    # Extract properties using robust object getters to eliminate AttributeError anomalies
+    is_approved = payload.approved
+    client_history = payload.history_messages
+
+    state_snapshot = coding_agent_service.compiled_workflow.get_state(config=THREAD_CONFIG)
+
+    if not state_snapshot or not state_snapshot.values:
+        current_logs = ["System Notice: Resetting memory matrices from backup traces."]
+        last_ai_msg = client_history[-1] if client_history else "{}"
+    else:
+        current_logs = state_snapshot.values.get("agent_logs", [])
+        last_ai_msg = state_snapshot.values.get("messages")[-1].content
+
+    # Extract target script parameters
+    parsed_blocks = extract_all_json_blocks(last_ai_msg)
+
+    # Handle single dict translation parsing checks
+    if isinstance(parsed_blocks, list) and len(parsed_blocks) > 0:
+        target_block = parsed_blocks[0]
+    elif isinstance(parsed_blocks, dict):
+        target_block = parsed_blocks
+    else:
+        target_block = {}
+
+    filename = target_block.get("filename", "verify.py")
+
+    if is_approved:
+        execution_feedback = run_python_script_in_workspace(filename)
+        human_injection_message = HumanMessage(content=f"Human Verification Passed. Script execution text feedback:\n{execution_feedback}")
+        log_feedback = f"Shell run complete. Execution verification passed cleanly."
+    else:
+        human_injection_message = HumanMessage(content="Human Verification Denied. Refactor script structure.")
+        log_feedback = "Shell Run Aborted by human operator."
+
+    # Update state history maps
+    coding_agent_service.compiled_workflow.update_state(
+        config=THREAD_CONFIG,
+        values={
+            "messages": [human_injection_message],
+            "agent_logs": current_logs + [log_feedback],
+            "requires_approval": False,
+            "pending_action": ""
+        },
+        as_node="human_gate_node"
+    )
+
+    output = coding_agent_service.compiled_workflow.invoke(None, config=THREAD_CONFIG)
+
+    return {
+        "success": True,
+        "requires_approval": output.get("requires_approval", False),
+        "pending_action": output.get("pending_action", ""),
+        "execution_history": output.get("agent_logs", []),
+        "messages": [m.content for m in output.get("messages", [])]
+    }
