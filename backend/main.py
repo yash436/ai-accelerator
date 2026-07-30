@@ -6,14 +6,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, EmailStr
 from rag_engine import ProductionRAGEngine
+from orchestrator import AIOrchestrationEngine
 
 app = FastAPI(title="Enterprise Streaming Engine", version="1.0.0")
 rag_service = ProductionRAGEngine() # Instantiate vector core
+orchestrator_service = AIOrchestrationEngine()
 
 # Setup CORS for Next.js frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:11434"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -122,3 +124,21 @@ async def search_knowledge(payload: QueryPayload):
         required_perm=payload.user_role
     )
     return {"success": True, "results": matches}
+
+class ChatPayload(BaseModel):
+    message: str = Field(..., min_length=2)
+    role: str = Field(default="admin_level_1")
+
+@app.post("/api/v1/chat/stream")
+async def chat_stream_endpoint(payload: ChatPayload):
+    """
+    Accepts a user chat question, queries the local ChromaDB context,
+    and returns a live text token execution stream generated via local Ollama.
+    """
+    return StreamingResponse(
+        orchestrator_service.stream_rag_pipeline(
+            question=payload.message,
+            user_role=payload.role
+        ),
+        media_type="text/event-stream"
+    )
