@@ -2,24 +2,53 @@
 import React, { useState } from 'react';
 
 export default function Home() {
-  const [requirement, setRequirement] = useState(
-    "Write a Fibonacci script in calculation.py. Then, create a verification script in verify.py that imports it and tests that fibonacci(6) equals 8."
-  );
+  // Panel A Hooks: Web Market Intelligence Agent Hooks
+  const [intelTopic, setIntelTopic] = useState("React Frontend Trends and AI Coding Assistants");
+  const [intelFile, setIntelFile] = useState("react_trends_2026.md");
+  const [intelLogs, setIntelLogs] = useState<string[]>([]);
+  const [intelOutput, setIntelOutput] = useState("");
+  const [intelLoading, setIntelLoading] = useState(false);
+
+  // Panel B Hooks: Core TDD Workspace Shell Automation Gating Hooks
+  const [requirement, setRequirement] = useState("Write a Fibonacci script in calculation.py. Then, create a verification script in verify.py that tests that fibonacci(6) equals 8.");
   const [serializedMsgs, setSerializedMsgs] = useState<string[]>([]);
   const [telemetryLogs, setTelemetryLogs] = useState<string[]>([]);
   const [isCompiling, setIsCompiling] = useState(false);
-
-  // Guardrail state hooks
   const [gateActive, setGateActive] = useState(false);
   const [pendingCommand, setPendingCommand] = useState("");
+
+  const handleIntelAgent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIntelLoading(true);
+    setIntelOutput("");
+    setIntelLogs(["Deploying web scrape micro-agent...", "Polling DuckDuckGo servers..."]);
+
+    try {
+      const res = await fetch('http://localhost:8000/api/v1/agent/intel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ search_topic: intelTopic, export_filename: intelFile })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIntelLogs(data.telemetry_history);
+        setIntelOutput(data.summary_report);
+      } else {
+        setIntelLogs(["Micro-agent failed to parse web content safely."]);
+      }
+    } catch {
+      setIntelLogs(["Failed to reach web micro-agent modules safely."]);
+    } finally {
+      setIntelLoading(false);
+    }
+  };
 
   const handleInitAgent = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsCompiling(true);
     setGateActive(false);
     setPendingCommand("");
-    setTelemetryLogs(["Waking local Llama3...", "Analyzing instructions..."]);
-
+    setTelemetryLogs(["Waking local Llama3...", "Cybernetics graph compilation running..."]);
     try {
       const res = await fetch('http://localhost:8000/api/v1/agent/init', {
         method: 'POST',
@@ -29,29 +58,24 @@ export default function Home() {
       const data = await res.json();
       updateAgentUIState(data);
     } catch {
-      setTelemetryLogs(prev => [...prev, "Connection to backend lost."]);
+      setTelemetryLogs(prev => [...prev, "Connection lost."]);
       setIsCompiling(false);
     }
   };
 
   const handleGateResponse = async (approved: boolean) => {
     setIsCompiling(true);
-    setGateActive(false); // Hide the gate temporarily while loading
-    setTelemetryLogs(prev => [...prev, approved ? "Human approved shell execution. Running script..." : "Human denied execution. Forcing re-planning..."]);
-
+    setGateActive(false);
+    setTelemetryLogs(prev => [...prev, approved ? "Human approved execution. Running script..." : "Human denied execution."]);
     try {
       const res = await fetch('http://localhost:8000/api/v1/agent/resume', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          approved: approved,
-          history_messages: serializedMsgs // Pass message history back to backend
-        })
+        body: JSON.stringify({ approved, history_messages: serializedMsgs })
       });
       const data = await res.json();
       updateAgentUIState(data);
     } catch {
-      setTelemetryLogs(prev => [...prev, "Failed to resume runtime execution loop."]);
       setIsCompiling(false);
     }
   };
@@ -59,8 +83,6 @@ export default function Home() {
   const updateAgentUIState = (data: any) => {
     setTelemetryLogs(data.execution_history || []);
     setSerializedMsgs(data.messages || []);
-
-    // Explicitly mapping backend snake_case to frontend state updates
     if (data.requires_approval) {
       setGateActive(true);
       setPendingCommand(data.pending_action || "");
@@ -72,80 +94,86 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen bg-zinc-950 text-zinc-100 p-8 font-mono text-xs">
-      <div className="w-full max-w-6xl mx-auto space-y-6">
+    <main className="flex min-h-screen bg-zinc-950 text-zinc-100 p-6 font-mono text-xs">
+      <div className="w-full max-w-7xl mx-auto space-y-6">
         <div>
-          <h1 className="text-lg font-bold text-white">Gated Autonomous Workspace Terminal</h1>
-          <p className="text-zinc-500 text-[11px]">Phase 4B — Human-in-the-Loop Shell Authorization Cockpit</p>
+          <h1 className="text-xl font-bold text-white tracking-tight">Enterprise Multi-Agent Command Deck</h1>
+          <p className="text-zinc-500 text-[11px]">Phase 4C — Decoupled Modular Sub-Graphs over Offline Workstations</p>
         </div>
 
-        {/* Input Configuration Console */}
-        <form onSubmit={handleInitAgent} className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-3">
-          <label className="block text-[10px] uppercase font-bold text-zinc-400">Target System Spec Instructions</label>
-          <textarea
-            rows={2} value={requirement} onChange={e => setRequirement(e.target.value)} disabled={isCompiling || gateActive}
-            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-zinc-200 focus:outline-none focus:border-indigo-500 leading-relaxed font-mono text-xs"
-          />
-          <button type="submit" disabled={isCompiling || gateActive} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-800 disabled:text-zinc-500 font-bold rounded-lg text-white transition-all">
-            {isCompiling ? "AGENT RUNNING ARCHITECTURE LOOPS..." : "DEPLOY GATED WORKFLOW ARCHITECTURE"}
-          </button>
-        </form>
-
-        {/* ACTIVE HUMAN-IN-THE-LOOP CONTROL GATEWAY PANEL */}
-        {gateActive && (
-          <div className="bg-amber-950/30 border-2 border-amber-500 rounded-xl p-6 space-y-4 animate-pulse shadow-xl">
-            <div className="flex justify-between items-center border-b border-amber-900/60 pb-2">
-              <h2 className="text-amber-400 font-bold tracking-wider text-sm">⚠️ SHELL SAFETY GUARDRAIL CHALLENGE</h2>
-              <span className="bg-amber-500 text-black font-bold px-2 py-0.5 rounded text-[10px]">INTERCEPT_ACTIVE</span>
+        {/* Layout Master Split System */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          
+          {/* PANEL MODULE A: Web Search Intelligence Agent */}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4 flex flex-col justify-between">
+            <div className="space-y-3">
+              <h2 className="text-sm font-bold text-sky-400 border-b border-zinc-800 pb-1.5">🌐 AGENT MODULE A: WEB INTEL MONITOR</h2>
+              <form onSubmit={handleIntelAgent} className="space-y-3">
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1">Target Search Concept Criteria</label>
+                  <input type="text" value={intelTopic} onChange={e => setIntelTopic(e.target.value)} disabled={intelLoading}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-zinc-200 focus:outline-none focus:border-sky-500 text-xs" />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1">Export Destination File Name</label>
+                  <input type="text" value={intelFile} onChange={e => setIntelFile(e.target.value)} disabled={intelLoading}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-zinc-200 focus:outline-none focus:border-sky-500 text-xs font-mono" />
+                </div>
+                <button type="submit" disabled={intelLoading} className="w-full py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-lg uppercase tracking-wider text-[11px]">
+                  {intelLoading ? "Scraping live tracking metrics..." : "Run Web Scrape Intelligence Engine"}
+                </button>
+              </form>
             </div>
-            <p className="text-zinc-200 text-xs">
-              The local autonomous agent is requesting explicit administrator approval to execute a command line process on your Windows workstation machine:
-            </p>
-            <pre className="bg-zinc-950 p-4 rounded-lg border border-zinc-800 text-amber-300 font-mono text-xs overflow-x-auto leading-normal">
-              {pendingCommand}
-            </pre>
-            <div className="flex gap-4 pt-2">
-              <button
-                onClick={() => handleGateResponse(true)}
-                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition-colors text-xs uppercase tracking-wider"
-              >
-                ✓ Approve & Execute Script Natively
-              </button>
-              <button
-                onClick={() => handleGateResponse(false)}
-                className="flex-1 py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg transition-colors text-xs uppercase tracking-wider"
-              >
-                ✗ Deny Action & Force Re-Write
-              </button>
-            </div>
-          </div>
-        )}
 
-        {/* Real-time Telemetry Analytics Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Action Log stream console */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex flex-col h-[380px]">
-            <h2 className="text-[10px] uppercase font-bold text-indigo-400 mb-2 border-b border-zinc-800 pb-1">📊 Workspace Execution Log Trace</h2>
-            <div className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-zinc-400 overflow-y-auto space-y-1.5 font-mono text-[11px]">
-              {telemetryLogs.length === 0 && <div className="text-zinc-600">Terminal offline. Awaiting pipeline start...</div>}
-              {telemetryLogs.map((log, idx) => (
-                <div key={idx} className="text-emerald-400"><span className="text-zinc-700">»</span> {log}</div>
-              ))}
-              {isCompiling && <div className="text-indigo-400 animate-pulse">Running compilation cycle on Windows...</div>}
+            <div className="grid grid-cols-1 gap-4 pt-4 mt-2 border-t border-zinc-800">
+              <div className="h-32 bg-zinc-950 rounded-lg p-3 overflow-y-auto space-y-1 text-zinc-400 text-[11px]">
+                <span className="block text-[10px] uppercase text-zinc-600 font-bold mb-1">» Scrape Step Telemetry:</span>
+                {intelLogs.map((log, idx) => <div key={idx} className="text-sky-400">» {log}</div>)}
+              </div>
+              <div className="h-44 bg-zinc-950 rounded-lg p-3 overflow-y-auto whitespace-pre-wrap text-zinc-300 leading-relaxed text-[11px] border border-zinc-800">
+                {intelOutput || <span className="text-zinc-700">Awaiting web agent execution pass... Report content will populate markdown format previews natively here.</span>}
+              </div>
             </div>
           </div>
 
-          {/* Model thought array console */}
-          <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex flex-col h-[380px]">
-            <h2 className="text-[10px] uppercase font-bold text-emerald-400 mb-2 border-b border-zinc-800 pb-1">🧠 Current Agent Memory State Summary</h2>
-            <div className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg p-4 text-zinc-200 overflow-y-auto whitespace-pre-wrap leading-relaxed font-mono text-xs">
-              {serializedMsgs.length === 0 ? (
-                <span className="text-zinc-600">Terminal idle. Waiting for compilation deployment execution...</span>
-              ) : (
-                serializedMsgs[serializedMsgs.length - 1]
-              )}
+          {/* PANEL MODULE B: Gated TDD Coding Workspace Agent */}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4 flex flex-col justify-between">
+            <div className="space-y-3">
+              <h2 className="text-sm font-bold text-indigo-400 border-b border-zinc-800 pb-1.5">💻 AGENT MODULE B: TDD WORKSPACE SYSTEM</h2>
+              <form onSubmit={handleInitAgent} className="space-y-3">
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-zinc-500 mb-1">Target Engineering Requirement Spec</label>
+                  <textarea rows={3} value={requirement} onChange={e => setRequirement(e.target.value)} disabled={isCompiling || gateActive}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-zinc-200 focus:outline-none focus:border-indigo-500 text-xs leading-normal" />
+                </div>
+                <button type="submit" disabled={isCompiling || gateActive} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg uppercase tracking-wider text-[11px]">
+                  {isCompiling ? "Compiling source elements..." : "Deploy Gated Workflow Architecture"}
+                </button>
+              </form>
+            </div>
+
+            {gateActive && (
+              <div className="bg-amber-950/40 border-2 border-amber-500 rounded-lg p-4 space-y-3 my-2 shadow-xl animate-pulse">
+                <h3 className="text-amber-400 font-bold text-[11px] uppercase">⚠️ ADMINISTRATOR CONTROL HOOK INTERCEPT</h3>
+                <pre className="bg-zinc-950 p-2.5 rounded text-[10px] text-amber-200 overflow-x-auto">{pendingCommand}</pre>
+                <div className="flex gap-2 text-[10px]">
+                  <button onClick={() => handleGateResponse(true)} className="flex-1 py-1.5 bg-emerald-600 text-white font-bold rounded">✓ Run Script Natively</button>
+                  <button onClick={() => handleGateResponse(false)} className="flex-1 py-1.5 bg-rose-600 text-white font-bold rounded">✗ Block Command</button>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-4 pt-4 mt-2 border-t border-zinc-800">
+              <div className="h-32 bg-zinc-950 rounded-lg p-3 overflow-y-auto space-y-1 text-zinc-400 text-[11px]">
+                <span className="block text-[10px] uppercase text-zinc-600 font-bold mb-1">» Shell Step Telemetry:</span>
+                {telemetryLogs.map((log, idx) => <div key={idx} className="text-emerald-400">» {log}</div>)}
+              </div>
+              <div className="h-44 bg-zinc-950 rounded-lg p-3 overflow-y-auto text-zinc-300 text-[11px] border border-zinc-800 whitespace-pre-wrap">
+                {serializedMsgs.length === 0 ? <span className="text-zinc-700">Awaiting agent activation loop... Memory traces will print details here.</span> : serializedMsgs[serializedMsgs.length - 1]}
+              </div>
             </div>
           </div>
+
         </div>
       </div>
     </main>

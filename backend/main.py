@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, EmailStr
 from rag_engine import ProductionRAGEngine
 from orchestrator import AIOrchestrationEngine
+from intel_engine import MarketIntelEngine
 
 # Explicitly import our functional tool handlers and the graph engine class
 from agent_engine import CodingTDAgent, run_python_script_in_workspace, extract_all_json_blocks
@@ -17,6 +18,7 @@ app = FastAPI(title="Enterprise AI Accelerator Hub", version="1.0.0")
 rag_service = ProductionRAGEngine() # Instantiate vector core
 orchestrator_service = AIOrchestrationEngine()
 coding_agent_service = CodingTDAgent()
+intel_service = MarketIntelEngine()
 
 # Setup CORS for Next.js frontend
 app.add_middleware(
@@ -249,3 +251,40 @@ async def resume_agent_run(payload: ResumeTaskPayload):
         "execution_history": output.get("agent_logs", []),
         "messages": [m.content for m in output.get("messages", [])]
     }
+
+class IntelTaskPayload(BaseModel):
+    search_topic: str = Field(..., min_length=3)
+    export_filename: str = Field(default="market_research.md")
+
+@app.post("/api/v1/agent/intel")
+async def execute_market_intel_agent(payload: IntelTaskPayload):
+    """
+    Accepts research criteria parameters, scrapes data dynamically over the web, 
+    and writes a verified, structured analysis report file straight to data_storage.
+    """
+    # Execute the synchronous blocking workflow safely within the fast async route block
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(
+        None, 
+        intel_service.run_intel_workflow, 
+        payload.search_topic, 
+        payload.export_filename
+    )
+    
+    if result.get("success"):
+        return {
+            "success": True,
+            "summary_report": result["report_preview"],
+            "telemetry_history": [
+                f"Initialized live DuckDuckGo web search vectors tracking: {payload.search_topic}",
+                "Successfully scraped live web indexes.",
+                f"Structured data payload via local Llama3.",
+                f"Wrote file securely to disk: {payload.export_filename}"
+            ]
+        }
+    else:
+        return {
+            "success": False,
+            "summary_report": f"Pipeline failure error occurred: {result.get('error_log')}",
+            "telemetry_history": ["Failed to finalize web search intelligence gathering nodes context."]
+        }
